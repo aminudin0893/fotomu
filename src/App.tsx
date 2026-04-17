@@ -88,12 +88,14 @@ export default function App() {
     setStatus({ isCompressing: true, progress: 0, error: null });
 
     const options = {
-      maxSizeMB: 0.8, // Optimized for web delivery (<1MB)
+      maxSizeMB: 0.8, // Batas maksimal 800KB sesuai permintaan untuk website ringan
       maxWidthOrHeight: maxWidth,
       useWebWorker: true,
       onProgress: (progress: number) => setStatus(prev => ({ ...prev, progress })),
       initialQuality: quality,
       fileType: targetFormat,
+      alwaysKeepResolution: true, // Menjaga resolusi asli agar tetap tajam saat di-zoom
+      preserveExif: true, // Mempertahankan profil warna dan metadata agar warna tetap asli
     };
 
     try {
@@ -153,10 +155,16 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm"
+            className="inline-flex items-center gap-4"
           >
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-xs font-medium tracking-wide uppercase text-gray-500">Cernih Engine v1.0</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-xs font-medium tracking-wide uppercase text-gray-500">Cernih Engine v1.1 Pro</span>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-100 rounded-full shadow-sm">
+              <Zap className="w-3 h-3 text-blue-600 fill-blue-600" />
+              <span className="text-[10px] font-bold tracking-widest uppercase text-blue-600">High-Definition Enabled</span>
+            </div>
           </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
