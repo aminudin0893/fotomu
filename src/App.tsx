@@ -94,8 +94,9 @@ export default function App() {
       onProgress: (progress: number) => setStatus(prev => ({ ...prev, progress })),
       initialQuality: quality,
       fileType: targetFormat,
-      alwaysKeepResolution: true, // Menjaga resolusi asli agar tetap tajam saat di-zoom
-      preserveExif: true, // Mempertahankan profil warna dan metadata agar warna tetap asli
+      alwaysKeepResolution: true, // WAJIB: Menjaga resolusi asli agar tetap tajam (mencegah blur akibat downscaling)
+      preserveExif: true, // Mempertahankan metadata & profil warna agar warna tetap cernih
+      maxIteration: 15, // Mencoba lebih keras untuk menemukan kualitas tertinggi yang pas dalam 800KB
     };
 
     try {
@@ -354,14 +355,20 @@ export default function App() {
                             <p className="text-sm font-semibold text-gray-600">Memproses... {Math.round(status.progress)}%</p>
                           </div>
                         ) : image.compressedUrl ? (
-                          <motion.img 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            src={image.compressedUrl} 
-                            alt="Compressed" 
-                            className="w-full h-full object-contain"
-                            referrerPolicy="no-referrer"
-                          />
+                          <div className="relative w-full h-full">
+                            <motion.img 
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              src={image.compressedUrl} 
+                              alt="Compressed" 
+                              className="w-full h-full object-contain"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute top-2 right-2 bg-blue-600/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              CRYSTAL CLEAR HD
+                            </div>
+                          </div>
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-gray-400">
                             <Info className="w-6 h-6 mr-2 opacity-50" />
