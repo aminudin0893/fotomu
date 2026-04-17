@@ -88,7 +88,7 @@ export default function App() {
     setStatus({ isCompressing: true, progress: 0, error: null });
 
     const options = {
-      maxSizeMB: 1, // Target size, library will try its best
+      maxSizeMB: 0.8, // Optimized for web delivery (<1MB)
       maxWidthOrHeight: maxWidth,
       useWebWorker: true,
       onProgress: (progress: number) => setStatus(prev => ({ ...prev, progress })),
@@ -280,8 +280,13 @@ export default function App() {
                     </div>
 
                     <div className="space-y-4">
-                      <label className="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                      <label className="text-sm font-semibold text-gray-600 flex items-center justify-between">
                         Format Target
+                        {targetFormat === 'image/webp' && (
+                          <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full border border-green-100 animate-pulse">
+                            REKOMENDASI WEB
+                          </span>
+                        )}
                       </label>
                       <div className="flex gap-2">
                         {[
