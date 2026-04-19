@@ -300,29 +300,28 @@ export default function App() {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Pass 1: Crystal HD Base + Noise Melting
-      // Drawing into a larger canvas already smooths pixels. 
-      // We add a subtle blur that specifically targets sensor noise particles
+      // Pass 1: Natural HD Base + Precision Noise Melting
+      // We use a lighter initial blur to preserve fine textures while melting sensor noise
       if (sharpenFactor > 0) {
-        ctx.filter = `blur(${sharpenFactor * 0.45}px) brightness(1.01)`;
+        ctx.filter = `blur(${sharpenFactor * 0.35}px) brightness(1.01)`;
       }
       ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-      // Pass 2: Professional Color & Edge Definition (Triple Contrast)
+      // Pass 2: Balanced Color & Natural Sharpness
       if (sharpenFactor > 0) {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = targetWidth;
         tempCanvas.height = targetHeight;
         const tempCtx = tempCanvas.getContext('2d')!;
         
-        // High Saturation + Sharpness Simulation
-        // Reference image shows very vibrant blues and greens
-        tempCtx.filter = `contrast(${1 + sharpenFactor * 1.1}) saturate(${1 + sharpenFactor * 0.75}) brightness(1.05)`;
+        // Optimizing for "Harmonious" colors: Moderate contrast and subtle saturation
+        // This ensures the result is clear and sharp without looking "over-edited"
+        tempCtx.filter = `contrast(${1 + sharpenFactor * 0.45}) saturate(${1 + sharpenFactor * 0.25}) brightness(1.03)`;
         tempCtx.drawImage(canvas, 0, 0);
         
-        // Pass 3: Edge Pop & Final Denoise Clean-up
+        // Pass 3: Professional Clarity & Finishing Touches
         ctx.clearRect(0, 0, targetWidth, targetHeight);
-        ctx.filter = `contrast(${1 + sharpenFactor * 0.25}) brightness(${1 + sharpenFactor * 0.03}) blur(0.08px)`;
+        ctx.filter = `contrast(${1 + sharpenFactor * 0.12}) brightness(${1 + sharpenFactor * 0.01}) blur(0.04px)`;
         ctx.drawImage(tempCanvas, 0, 0);
       }
 
@@ -622,8 +621,8 @@ export default function App() {
                                   className="w-full h-1.5 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                 />
                                 <div className="flex justify-between text-[9px] text-indigo-400 uppercase font-black tracking-tighter">
-                                  <span>Zero Noise</span>
-                                  <span>Crystal Sharp HD</span>
+                                  <span>Natural Clean</span>
+                                  <span>Pro Sharp HD</span>
                                 </div>
                               </div>
 
