@@ -263,50 +263,64 @@ export default function App() {
     setStatus({ isCompressing: true, progress: 0, error: null });
 
     try {
-      // Step 1: Sharpening using Canvas if sharpenFactor > 0
+      // Step 1: Load image and setup high-res target canvas
       const img = new Image();
       img.src = image.originalUrl;
       await new Promise((resolve) => (img.onload = resolve));
+
+      // Calculate target dimensions for Master Upscale
+      let targetWidth = img.width;
+      let targetHeight = img.height;
+      if (Math.max(img.width, img.height) < enhancePreset) {
+        const ratio = enhancePreset / Math.max(img.width, img.height);
+        targetWidth = Math.round(img.width * ratio);
+        targetHeight = Math.round(img.height * ratio);
+      }
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Could not get canvas context');
 
-      canvas.width = img.width;
-      canvas.height = img.height;
+      // Set canvas to TARGET size immediately (Upscale first)
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
 
-      // High-quality rendering
+      // Enable High-Quality interpolation during upscale
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Draw original
-      ctx.drawImage(img, 0, 0);
-
-      // Apply sharpening and color enhancement filters
-      // We use a combination of filters to simulate "HD/Clarity" effect
-      // Higher multipliers for contrast and saturation to make colors "ชัดเจน" (clear)
+      // Pass 1: Initial HD Upscale + Denoise Base
+      // Drawing into a larger canvas already smooths pixels. 
+      // We add a tiny initial blur to melt away noise particles (bintik)
       if (sharpenFactor > 0) {
-        ctx.filter = `contrast(${1 + sharpenFactor * 0.6}) saturate(${1 + sharpenFactor * 0.5}) brightness(${1 + sharpenFactor * 0.08}) contrast(${1 + sharpenFactor * 0.1})`;
-        ctx.drawImage(canvas, 0, 0);
+        ctx.filter = `blur(${sharpenFactor * 0.4}px)`;
+      }
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+      // Pass 2: Vector Clarity & Color Precision (Deep Processing)
+      if (sharpenFactor > 0) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = targetWidth;
+        tempCanvas.height = targetHeight;
+        const tempCtx = tempCanvas.getContext('2d')!;
+        
+        // Use the current upscaled + blurred state as source
+        // Apply sharpening (contrast) and color boost (saturate)
+        // Contrast(1.2) + Contrast(1.1) creates deep edge definition
+        tempCtx.filter = `contrast(${1 + sharpenFactor * 0.8}) saturate(${1 + sharpenFactor * 0.5}) brightness(1.02)`;
+        tempCtx.drawImage(canvas, 0, 0);
+        
+        // Final polish for "Ultra Clean" feel
+        ctx.clearRect(0, 0, targetWidth, targetHeight);
+        ctx.filter = `contrast(${1 + sharpenFactor * 0.15}) brightness(${1 + sharpenFactor * 0.02}) blur(0.1px)`;
+        ctx.drawImage(tempCanvas, 0, 0);
       }
 
-      // Convert canvas to blob (prefer high quality)
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      // Final step: Convert to file with maximum quality
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, targetFormat, 1.0));
       if (!blob) throw new Error('Failed to create blob from canvas');
 
-      // Step 2: Upscale and final optimize using browser-image-compression
-      const options = {
-        maxSizeMB: 20, // Larger size for Ultra HD Master
-        maxWidthOrHeight: enhancePreset,
-        useWebWorker: true,
-        onProgress: (progress: number) => setStatus(prev => ({ ...prev, progress })),
-        initialQuality: 1.0, // Maximum quality
-        fileType: targetFormat,
-        alwaysKeepResolution: false, 
-        preserveExif: true,
-      };
-
-      const enhancedFile = await imageCompression(new File([blob], image.original.name, { type: 'image/png' }), options);
+      const enhancedFile = new File([blob], image.original.name, { type: targetFormat });
       const url = URL.createObjectURL(enhancedFile);
       
       setImage(prev => prev ? ({
@@ -598,8 +612,8 @@ export default function App() {
                                   className="w-full h-1.5 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                 />
                                 <div className="flex justify-between text-[9px] text-indigo-400 uppercase font-black tracking-tighter">
-                                  <span>Original Colors</span>
-                                  <span>Ultra Vibrant HD</span>
+                                  <span>Super Clean</span>
+                                  <span>Deep HD Master</span>
                                 </div>
                               </div>
 
