@@ -28,7 +28,10 @@ import {
   LogIn,
   ZoomIn,
   ZoomOut,
-  Maximize
+  Maximize,
+  Sparkles,
+  Cpu,
+  Layers
 } from 'lucide-react';
 
 // --- Types ---
@@ -192,6 +195,9 @@ export default function App() {
   const [maxWidth, setMaxWidth] = useState(2560); // 2K standard
   const [targetFormat, setTargetFormat] = useState<'image/jpeg' | 'image/png' | 'image/webp'>('image/jpeg');
   const [zoom, setZoom] = useState(1);
+  const [activeTab, setActiveTab] = useState<'compress' | 'enhance'>('compress');
+  const [enhancePreset, setEnhancePreset] = useState<number>(3840); // Default 4K
+  const [sharpenFactor, setSharpenFactor] = useState(0.4);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -251,6 +257,66 @@ export default function App() {
     }
   };
 
+  const enhanceImage = async () => {
+    if (!image) return;
+
+    setStatus({ isCompressing: true, progress: 0, error: null });
+
+    try {
+      // Step 1: Sharpening using Canvas if sharpenFactor > 0
+      const img = new Image();
+      img.src = image.originalUrl;
+      await new Promise((resolve) => (img.onload = resolve));
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Could not get canvas context');
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Draw original
+      ctx.drawImage(img, 0, 0);
+
+      // Apply sharpening filter via CSS filter string (modern & fast)
+      // contrast and saturate help with clarity, brightness adds "HD" feel
+      if (sharpenFactor > 0) {
+        ctx.filter = `contrast(${1 + sharpenFactor * 0.2}) saturate(${1 + sharpenFactor * 0.1}) brightness(1.02)`;
+        ctx.drawImage(canvas, 0, 0);
+      }
+
+      // Convert canvas to blob
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Failed to create blob from canvas');
+
+      // Step 2: Upscale and final optimize using browser-image-compression
+      const options = {
+        maxSizeMB: 5, // Biarkan file lebih besar untuk kualitas HD
+        maxWidthOrHeight: enhancePreset,
+        useWebWorker: true,
+        onProgress: (progress: number) => setStatus(prev => ({ ...prev, progress })),
+        initialQuality: 1.0, // Kualitas maksimal
+        fileType: targetFormat,
+        alwaysKeepResolution: false, // Biarkan upscaling bekerja jika target > original
+        preserveExif: true,
+      };
+
+      const enhancedFile = await imageCompression(new File([blob], image.original.name, { type: 'image/png' }), options);
+      const url = URL.createObjectURL(enhancedFile);
+      
+      setImage(prev => prev ? ({
+        ...prev,
+        compressed: enhancedFile,
+        compressedUrl: url,
+      }) : null);
+      
+      setStatus({ isCompressing: false, progress: 100, error: null });
+    } catch (err) {
+      console.error(err);
+      setStatus({ isCompressing: false, progress: 0, error: 'Gagal meningkatkan kualitas gambar.' });
+    }
+  };
+
   const reset = () => {
     if (image) {
       URL.revokeObjectURL(image.originalUrl);
@@ -273,8 +339,9 @@ export default function App() {
     };
     const extension = extMap[targetFormat] || 'jpg';
     const baseName = image.original.name.substring(0, image.original.name.lastIndexOf('.')) || 'image';
+    const prefix = activeTab === 'enhance' ? 'enhanced' : 'compressed';
     
-    link.download = `compressed_${baseName}.${extension}`;
+    link.download = `${prefix}_${baseName}.${extension}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -294,8 +361,36 @@ export default function App() {
               key="app"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="w-full space-y-12 md:space-y-16"
+              className="w-full space-y-8 md:space-y-12"
             >
+              {/* Tab Switcher */}
+              <div className="flex justify-center">
+                <div className="bg-white/50 backdrop-blur-xl p-1.5 rounded-[24px] border border-white/50 shadow-sm flex items-center gap-1">
+                  <button
+                    onClick={() => setActiveTab('compress')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-[20px] text-xs font-black uppercase tracking-widest transition-all ${
+                      activeTab === 'compress' 
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-white/50'
+                    }`}
+                  >
+                    <Zap className={`w-4 h-4 ${activeTab === 'compress' ? 'fill-white' : ''}`} />
+                    Kompresi
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('enhance')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-[20px] text-xs font-black uppercase tracking-widest transition-all ${
+                      activeTab === 'enhance' 
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-white/50'
+                    }`}
+                  >
+                    <Sparkles className={`w-4 h-4 ${activeTab === 'enhance' ? 'fill-white' : ''}`} />
+                    HD Enhancer
+                  </button>
+                </div>
+              </div>
+
               {/* Header */}
               <header className="text-center space-y-4 md:space-y-6">
                 <motion.div 
@@ -395,77 +490,162 @@ export default function App() {
                         </div>
 
                         {/* Settings Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50/50 p-5 md:p-6 rounded-[24px] md:rounded-3xl border border-gray-100">
-                          <div className="space-y-4">
-                            <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center justify-between">
-                              Kualitas
-                              <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">{Math.round(quality * 100)}%</span>
-                            </label>
-                            <input 
-                              type="range" 
-                              min="0.1" 
-                              max="1.0" 
-                              step="0.05"
-                              value={quality}
-                              onChange={(e) => setQuality(parseFloat(e.target.value))}
-                              disabled={status.isCompressing}
-                              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                            />
-                            <div className="flex justify-between text-[9px] text-gray-400 uppercase font-black tracking-tighter">
-                              <span>Small</span>
-                              <span>Pro</span>
-                            </div>
-                          </div>
-
-                          <div className="space-y-4">
-                            <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center justify-between">
-                              Dimensi 
-                              <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-[10px] font-bold">{maxWidth}px</span>
-                            </label>
-                            <select 
-                              value={maxWidth}
-                              onChange={(e) => setMaxWidth(parseInt(e.target.value))}
-                              disabled={status.isCompressing}
-                              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-xs font-bold appearance-none cursor-pointer"
+                        <AnimatePresence mode="wait">
+                          {activeTab === 'compress' ? (
+                            <motion.div 
+                              key="compress-settings"
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: 20 }}
+                              className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50/50 p-5 md:p-6 rounded-[24px] md:rounded-3xl border border-gray-100"
                             >
-                              <option value="1280">HD (1280px)</option>
-                              <option value="1920">Full HD (1920px)</option>
-                              <option value="2560">2K (2560px)</option>
-                              <option value="3840">4K (3840px)</option>
-                            </select>
-                          </div>
-
-                          <div className="space-y-4">
-                            <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center justify-between">
-                              Format
-                              {targetFormat === 'image/webp' && (
-                                <span className="text-[9px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
-                                  BEST
-                                </span>
-                              )}
-                            </label>
-                            <div className="grid grid-cols-3 gap-2">
-                              {[
-                                { label: 'JPG', value: 'image/jpeg' },
-                                { label: 'PNG', value: 'image/png' },
-                                { label: 'WEBP', value: 'image/webp' }
-                              ].map((fmt) => (
-                                <button
-                                  key={fmt.value}
-                                  onClick={() => setTargetFormat(fmt.value as any)}
+                              <div className="space-y-4">
+                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center justify-between">
+                                  Kualitas
+                                  <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">{Math.round(quality * 100)}%</span>
+                                </label>
+                                <input 
+                                  type="range" 
+                                  min="0.1" 
+                                  max="1.0" 
+                                  step="0.05"
+                                  value={quality}
+                                  onChange={(e) => setQuality(parseFloat(e.target.value))}
                                   disabled={status.isCompressing}
-                                  className={`py-2 px-1 rounded-xl text-[10px] font-black transition-all border ${
-                                    targetFormat === fmt.value 
-                                      ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
-                                      : 'bg-white text-gray-400 border-gray-200 hover:border-blue-300'
-                                  }`}
+                                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                />
+                                <div className="flex justify-between text-[9px] text-gray-400 uppercase font-black tracking-tighter">
+                                  <span>Small</span>
+                                  <span>Pro</span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-4">
+                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center justify-between">
+                                  Dimensi 
+                                  <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-[10px] font-bold">{maxWidth}px</span>
+                                </label>
+                                <select 
+                                  value={maxWidth}
+                                  onChange={(e) => setMaxWidth(parseInt(e.target.value))}
+                                  disabled={status.isCompressing}
+                                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-xs font-bold appearance-none cursor-pointer"
                                 >
-                                  {fmt.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
+                                  <option value="1280">HD (1280px)</option>
+                                  <option value="1920">Full HD (1920px)</option>
+                                  <option value="2560">2K (2560px)</option>
+                                  <option value="3840">4K (3840px)</option>
+                                </select>
+                              </div>
+
+                              <div className="space-y-4">
+                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center justify-between">
+                                  Format
+                                  {targetFormat === 'image/webp' && (
+                                    <span className="text-[9px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
+                                      BEST
+                                    </span>
+                                  )}
+                                </label>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {[
+                                    { label: 'JPG', value: 'image/jpeg' },
+                                    { label: 'PNG', value: 'image/png' },
+                                    { label: 'WEBP', value: 'image/webp' }
+                                  ].map((fmt) => (
+                                    <button
+                                      key={fmt.value}
+                                      onClick={() => setTargetFormat(fmt.value as any)}
+                                      disabled={status.isCompressing}
+                                      className={`py-2 px-1 rounded-xl text-[10px] font-black transition-all border ${
+                                        targetFormat === fmt.value 
+                                          ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
+                                          : 'bg-white text-gray-400 border-gray-200 hover:border-blue-300'
+                                      }`}
+                                    >
+                                      {fmt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </motion.div>
+                          ) : (
+                            <motion.div 
+                              key="enhance-settings"
+                              initial={{ opacity: 0, x: 20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -20 }}
+                              className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-indigo-50/30 p-5 md:p-6 rounded-[24px] md:rounded-3xl border border-indigo-100"
+                            >
+                              <div className="space-y-4">
+                                <label className="text-xs font-bold uppercase tracking-widest text-indigo-600 flex items-center justify-between">
+                                  Ketajaman (Sharpness)
+                                  <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">{Math.round(sharpenFactor * 100)}%</span>
+                                </label>
+                                <input 
+                                  type="range" 
+                                  min="0.1" 
+                                  max="1.0" 
+                                  step="0.05"
+                                  value={sharpenFactor}
+                                  onChange={(e) => setSharpenFactor(parseFloat(e.target.value))}
+                                  disabled={status.isCompressing}
+                                  className="w-full h-1.5 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                />
+                                <div className="flex justify-between text-[9px] text-indigo-400 uppercase font-black tracking-tighter">
+                                  <span>Soft</span>
+                                  <span>Ultra HD</span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-4">
+                                <label className="text-xs font-bold uppercase tracking-widest text-indigo-600 flex items-center justify-between">
+                                  Master Upscale
+                                  <span className="bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                    {enhancePreset === 1920 ? 'HD' : enhancePreset === 3840 ? '4K' : '8K'}
+                                  </span>
+                                </label>
+                                <select 
+                                  value={enhancePreset}
+                                  onChange={(e) => setEnhancePreset(parseInt(e.target.value))}
+                                  disabled={status.isCompressing}
+                                  className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-xs font-bold appearance-none cursor-pointer text-indigo-900"
+                                >
+                                  <option value="1920">HD Master (1080p)</option>
+                                  <option value="3840">Ultra HD (4K)</option>
+                                  <option value="7680">Cinema (8K)</option>
+                                </select>
+                              </div>
+
+                              <div className="space-y-4">
+                                <label className="text-xs font-bold uppercase tracking-widest text-indigo-600 flex items-center justify-between">
+                                  Output Format
+                                  <Cpu className="w-3 h-3 text-indigo-400" />
+                                </label>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {[
+                                    { label: 'JPG', value: 'image/jpeg' },
+                                    { label: 'PNG', value: 'image/png' },
+                                    { label: 'WEBP', value: 'image/webp' }
+                                  ].map((fmt) => (
+                                    <button
+                                      key={fmt.value}
+                                      onClick={() => setTargetFormat(fmt.value as any)}
+                                      disabled={status.isCompressing}
+                                      className={`py-2 px-1 rounded-xl text-[10px] font-black transition-all border ${
+                                        targetFormat === fmt.value 
+                                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' 
+                                          : 'bg-white text-indigo-400 border-indigo-200 hover:border-indigo-300'
+                                      }`}
+                                    >
+                                      {fmt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
 
                         {/* Zoom Controls */}
                         <div className="flex items-center justify-center pt-2">
@@ -525,24 +705,28 @@ export default function App() {
                           {/* Compressed View */}
                           <div className="space-y-3">
                             <div className="flex justify-between items-end">
-                              <span className="text-[10px] uppercase font-bold tracking-widest text-blue-600">Compressed</span>
+                              <span className={`text-[10px] uppercase font-bold tracking-widest ${activeTab === 'enhance' ? 'text-indigo-600' : 'text-blue-600'}`}>
+                                {activeTab === 'enhance' ? 'Enhanced HD' : 'Compressed'}
+                              </span>
                               {image.compressed && (
-                                <span className="text-[10px] font-bold text-blue-600">
+                                <span className={`text-[10px] font-bold ${activeTab === 'enhance' ? 'text-indigo-600' : 'text-blue-600'}`}>
                                   <ByteFormatter bytes={image.compressed.size} />
                                 </span>
                               )}
                             </div>
-                            <div className="aspect-video bg-gray-50 rounded-2xl md:rounded-3xl overflow-auto relative border border-blue-100 group custom-scrollbar">
+                            <div className={`aspect-video bg-gray-50 rounded-2xl md:rounded-3xl overflow-auto relative border group custom-scrollbar ${activeTab === 'enhance' ? 'border-indigo-100' : 'border-blue-100'}`}>
                               {status.isCompressing ? (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-md z-10 transition-all">
                                   <motion.div
                                     animate={{ rotate: 360 }}
                                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                    className="p-3 bg-blue-50 rounded-2xl mb-4"
+                                    className={`p-3 ${activeTab === 'enhance' ? 'bg-indigo-50' : 'bg-blue-50'} rounded-2xl mb-4`}
                                   >
-                                    <RefreshCw className="w-8 h-8 text-blue-600" />
+                                    <RefreshCw className={`w-8 h-8 ${activeTab === 'enhance' ? 'text-indigo-600' : 'text-blue-600'}`} />
                                   </motion.div>
-                                  <p className="text-xs font-bold text-gray-600 tracking-widest uppercase">Memproses {Math.round(status.progress)}%</p>
+                                  <p className="text-xs font-bold text-gray-600 tracking-widest uppercase">
+                                    {activeTab === 'enhance' ? 'Enhancing Quality' : 'Memproses'} {Math.round(status.progress)}%
+                                  </p>
                                 </div>
                               ) : image.compressedUrl ? (
                                 <div className="relative w-full h-full overflow-auto">
@@ -550,14 +734,23 @@ export default function App() {
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     src={image.compressedUrl} 
-                                    alt="Compressed" 
+                                    alt="Result" 
                                     className="w-full h-full object-contain transition-transform duration-200 ease-out origin-center"
                                     style={{ transform: `scale(${zoom})` }}
                                     referrerPolicy="no-referrer"
                                   />
-                                  <div className="absolute top-3 right-3 bg-blue-600/90 backdrop-blur-sm text-white text-[9px] font-black px-2 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 z-20">
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    CRYSTAL CLEAR HD
+                                  <div className={`absolute top-3 right-3 backdrop-blur-sm text-white text-[9px] font-black px-2 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 z-20 ${activeTab === 'enhance' ? 'bg-indigo-600/90' : 'bg-blue-600/90'}`}>
+                                    {activeTab === 'enhance' ? (
+                                      <>
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        ULTRA HD ENHANCED
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        CRYSTAL CLEAR HD
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               ) : (
@@ -574,30 +767,50 @@ export default function App() {
                         <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-100">
                           {!image.compressed ? (
                             <button
-                              onClick={compressImage}
+                              onClick={activeTab === 'compress' ? compressImage : enhanceImage}
                               disabled={status.isCompressing}
-                              className="flex-1 bg-gray-900 text-white rounded-2xl py-4 px-8 font-bold text-base md:text-lg hover:bg-black hover:shadow-2xl transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                              className={`flex-1 rounded-2xl py-4 px-8 font-bold text-base md:text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 text-white ${
+                                activeTab === 'enhance' 
+                                  ? 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200' 
+                                  : 'bg-gray-900 hover:bg-black hover:shadow-gray-200'
+                              } hover:shadow-2xl`}
                             >
-                              <Zap className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                              Mulai Kompresi
+                              {activeTab === 'enhance' ? (
+                                <Sparkles className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                              ) : (
+                                <Zap className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                              )}
+                              {activeTab === 'enhance' ? 'Tingkatkan Kualitas HD' : 'Mulai Kompresi'}
                             </button>
                           ) : (
                             <>
-                              <div className="flex-1 bg-blue-50 border border-blue-100 rounded-2xl px-6 flex items-center gap-4 py-3 md:py-4">
-                                <div className="bg-blue-600 rounded-xl p-2 shrink-0">
+                              <div className={`flex-1 border rounded-2xl px-6 flex items-center gap-4 py-3 md:py-4 ${
+                                activeTab === 'enhance' ? 'bg-indigo-50 border-indigo-100' : 'bg-blue-50 border-blue-100'
+                              }`}>
+                                <div className={`${activeTab === 'enhance' ? 'bg-indigo-600' : 'bg-blue-600'} rounded-xl p-2 shrink-0`}>
                                   <CheckCircle2 className="w-5 h-5 text-white" />
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 mb-0.5">Efficiency</p>
-                                  <p className="text-xl md:text-2xl font-black text-blue-900 leading-none">
-                                    {Math.round(((image.original.size - image.compressed.size) / image.original.size) * 100)}%
-                                    <span className="text-[10px] font-bold text-blue-500 ml-1.5 tracking-normal">SAVED</span>
+                                  <p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-0.5 ${activeTab === 'enhance' ? 'text-indigo-400' : 'text-blue-400'}`}>
+                                    {activeTab === 'enhance' ? 'HD Enhancement' : 'Efficiency'}
+                                  </p>
+                                  <p className={`text-xl md:text-2xl font-black leading-none ${activeTab === 'enhance' ? 'text-indigo-900' : 'text-blue-900'}`}>
+                                    {activeTab === 'enhance' ? (
+                                      'ACTIVE'
+                                    ) : (
+                                      `${Math.round(((image.original.size - image.compressed.size) / image.original.size) * 100)}%`
+                                    )}
+                                    <span className={`text-[10px] font-bold ml-1.5 tracking-normal ${activeTab === 'enhance' ? 'text-indigo-500' : 'text-blue-500'}`}>
+                                      {activeTab === 'enhance' ? 'MASTER QUALITY' : 'SAVED'}
+                                    </span>
                                   </p>
                                 </div>
                               </div>
                               <button
                                 onClick={downloadImage}
-                                className="sm:w-1/3 bg-gray-900 text-white rounded-2xl py-4 px-8 font-bold text-base md:text-lg hover:shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-3"
+                                className={`sm:w-1/3 text-white rounded-2xl py-4 px-8 font-bold text-base md:text-lg hover:shadow-2xl transition-all flex items-center justify-center gap-3 ${
+                                  activeTab === 'enhance' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-900 hover:bg-black'
+                                }`}
                               >
                                 <Download className="w-5 h-5" />
                                 Download
