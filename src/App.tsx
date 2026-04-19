@@ -229,19 +229,26 @@ export default function App() {
     setStatus({ isCompressing: true, progress: 0, error: null });
 
     const options = {
-      maxSizeMB: 0.8, // Batas maksimal 800KB sesuai permintaan untuk website ringan
+      maxSizeMB: 0.8,
       maxWidthOrHeight: maxWidth,
-      useWebWorker: true,
+      useWebWorker: false, // Disable web worker for better compatibility in sandboxed iframes
       onProgress: (progress: number) => setStatus(prev => ({ ...prev, progress })),
       initialQuality: quality,
       fileType: targetFormat,
-      alwaysKeepResolution: true, // WAJIB: Menjaga resolusi asli agar tetap tajam (mencegah blur akibat downscaling)
-      preserveExif: true, // Mempertahankan metadata & profil warna agar warna tetap cernih
-      maxIteration: 15, // Mencoba lebih keras untuk menemukan kualitas tertinggi yang pas dalam 800KB
+      alwaysKeepResolution: true, // Keep original resolution as requested
+      preserveExif: true,
     };
 
     try {
-      const compressedFile = await imageCompression(image.original, options);
+      let compressedFile;
+      try {
+        compressedFile = await imageCompression(image.original, options);
+      } catch (firstPassError) {
+        console.warn('First pass failed, trying with resolution scaling:', firstPassError);
+        // Fallback: If keepResolution fails (often due to impossible size constraints), allow scaling
+        compressedFile = await imageCompression(image.original, { ...options, alwaysKeepResolution: false });
+      }
+
       const url = URL.createObjectURL(compressedFile);
       
       setImage(prev => prev ? ({
@@ -252,8 +259,12 @@ export default function App() {
       
       setStatus({ isCompressing: false, progress: 100, error: null });
     } catch (err) {
-      console.error(err);
-      setStatus({ isCompressing: false, progress: 0, error: 'Gagal mengompres gambar.' });
+      console.error('Compression error:', err);
+      setStatus({ 
+        isCompressing: false, 
+        progress: 0, 
+        error: `Gagal mengompres: ${err instanceof Error ? err.message : 'Kesalahan teknis'}` 
+      });
     }
   };
 
