@@ -289,30 +289,29 @@ export default function App() {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Pass 1: Initial HD Upscale + Denoise Base
+      // Pass 1: Crystal HD Base + Noise Melting
       // Drawing into a larger canvas already smooths pixels. 
-      // We add a tiny initial blur to melt away noise particles (bintik)
+      // We add a subtle blur that specifically targets sensor noise particles
       if (sharpenFactor > 0) {
-        ctx.filter = `blur(${sharpenFactor * 0.4}px)`;
+        ctx.filter = `blur(${sharpenFactor * 0.45}px) brightness(1.01)`;
       }
       ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-      // Pass 2: Vector Clarity & Color Precision (Deep Processing)
+      // Pass 2: Professional Color & Edge Definition (Triple Contrast)
       if (sharpenFactor > 0) {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = targetWidth;
         tempCanvas.height = targetHeight;
         const tempCtx = tempCanvas.getContext('2d')!;
         
-        // Use the current upscaled + blurred state as source
-        // Apply sharpening (contrast) and color boost (saturate)
-        // Contrast(1.2) + Contrast(1.1) creates deep edge definition
-        tempCtx.filter = `contrast(${1 + sharpenFactor * 0.8}) saturate(${1 + sharpenFactor * 0.5}) brightness(1.02)`;
+        // High Saturation + Sharpness Simulation
+        // Reference image shows very vibrant blues and greens
+        tempCtx.filter = `contrast(${1 + sharpenFactor * 1.1}) saturate(${1 + sharpenFactor * 0.75}) brightness(1.05)`;
         tempCtx.drawImage(canvas, 0, 0);
         
-        // Final polish for "Ultra Clean" feel
+        // Pass 3: Edge Pop & Final Denoise Clean-up
         ctx.clearRect(0, 0, targetWidth, targetHeight);
-        ctx.filter = `contrast(${1 + sharpenFactor * 0.15}) brightness(${1 + sharpenFactor * 0.02}) blur(0.1px)`;
+        ctx.filter = `contrast(${1 + sharpenFactor * 0.25}) brightness(${1 + sharpenFactor * 0.03}) blur(0.08px)`;
         ctx.drawImage(tempCanvas, 0, 0);
       }
 
@@ -612,8 +611,8 @@ export default function App() {
                                   className="w-full h-1.5 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                 />
                                 <div className="flex justify-between text-[9px] text-indigo-400 uppercase font-black tracking-tighter">
-                                  <span>Super Clean</span>
-                                  <span>Deep HD Master</span>
+                                  <span>Zero Noise</span>
+                                  <span>Crystal Sharp HD</span>
                                 </div>
                               </div>
 
