@@ -25,7 +25,10 @@ import {
   User as UserIcon,
   Eye,
   EyeOff,
-  LogIn
+  LogIn,
+  ZoomIn,
+  ZoomOut,
+  Maximize
 } from 'lucide-react';
 
 // --- Types ---
@@ -188,6 +191,7 @@ export default function App() {
   const [quality, setQuality] = useState(0.8);
   const [maxWidth, setMaxWidth] = useState(2560); // 2K standard
   const [targetFormat, setTargetFormat] = useState<'image/jpeg' | 'image/png' | 'image/webp'>('image/jpeg');
+  const [zoom, setZoom] = useState(1);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -463,6 +467,42 @@ export default function App() {
                           </div>
                         </div>
 
+                        {/* Zoom Controls */}
+                        <div className="flex items-center justify-center pt-2">
+                          <div className="bg-white border border-gray-100 shadow-sm rounded-2xl flex items-center p-1.5 gap-2">
+                            <button 
+                              onClick={() => setZoom(prev => Math.max(0.25, prev - 0.25))}
+                              disabled={zoom <= 0.25}
+                              className="p-2 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                              title="Zoom Out"
+                            >
+                              <ZoomOut className="w-4 h-4 text-gray-500" />
+                            </button>
+                            
+                            <div className="px-3 border-x border-gray-50 flex items-center gap-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 w-12 text-center">
+                                {Math.round(zoom * 100)}%
+                              </span>
+                              <button 
+                                onClick={() => setZoom(1)}
+                                className={`p-1 rounded-md transition-colors ${zoom === 1 ? 'text-blue-600 bg-blue-50' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-50'}`}
+                                title="Reset Zoom"
+                              >
+                                <Maximize className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            <button 
+                              onClick={() => setZoom(prev => Math.min(2, prev + 0.25))}
+                              disabled={zoom >= 2}
+                              className="p-2 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                              title="Zoom In"
+                            >
+                              <ZoomIn className="w-4 h-4 text-gray-500" />
+                            </button>
+                          </div>
+                        </div>
+
                         {/* Performance Panel */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                           {/* Original View */}
@@ -471,11 +511,12 @@ export default function App() {
                               <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">Original</span>
                               <span className="text-[10px] font-bold text-gray-400"><ByteFormatter bytes={image.original.size} /></span>
                             </div>
-                            <div className="aspect-video bg-gray-50 rounded-2xl md:rounded-3xl overflow-hidden relative group border border-gray-100">
+                            <div className="aspect-video bg-gray-50 rounded-2xl md:rounded-3xl overflow-auto relative group border border-gray-100 custom-scrollbar">
                               <img 
                                 src={image.originalUrl} 
                                 alt="Original" 
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-contain transition-transform duration-200 ease-out origin-center"
+                                style={{ transform: `scale(${zoom})` }}
                                 referrerPolicy="no-referrer"
                               />
                             </div>
@@ -491,7 +532,7 @@ export default function App() {
                                 </span>
                               )}
                             </div>
-                            <div className="aspect-video bg-gray-50 rounded-2xl md:rounded-3xl overflow-hidden relative border border-blue-100 group">
+                            <div className="aspect-video bg-gray-50 rounded-2xl md:rounded-3xl overflow-auto relative border border-blue-100 group custom-scrollbar">
                               {status.isCompressing ? (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-md z-10 transition-all">
                                   <motion.div
@@ -504,16 +545,17 @@ export default function App() {
                                   <p className="text-xs font-bold text-gray-600 tracking-widest uppercase">Memproses {Math.round(status.progress)}%</p>
                                 </div>
                               ) : image.compressedUrl ? (
-                                <div className="relative w-full h-full">
+                                <div className="relative w-full h-full overflow-auto">
                                   <motion.img 
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     src={image.compressedUrl} 
                                     alt="Compressed" 
-                                    className="w-full h-full object-contain"
+                                    className="w-full h-full object-contain transition-transform duration-200 ease-out origin-center"
+                                    style={{ transform: `scale(${zoom})` }}
                                     referrerPolicy="no-referrer"
                                   />
-                                  <div className="absolute top-3 right-3 bg-blue-600/90 backdrop-blur-sm text-white text-[9px] font-black px-2 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5">
+                                  <div className="absolute top-3 right-3 bg-blue-600/90 backdrop-blur-sm text-white text-[9px] font-black px-2 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 z-20">
                                     <CheckCircle2 className="w-3.5 h-3.5" />
                                     CRYSTAL CLEAR HD
                                   </div>
