@@ -275,29 +275,34 @@ export default function App() {
       canvas.width = img.width;
       canvas.height = img.height;
 
+      // High-quality rendering
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
       // Draw original
       ctx.drawImage(img, 0, 0);
 
-      // Apply sharpening filter via CSS filter string (modern & fast)
-      // contrast and saturate help with clarity, brightness adds "HD" feel
+      // Apply sharpening and color enhancement filters
+      // We use a combination of filters to simulate "HD/Clarity" effect
+      // Higher multipliers for contrast and saturation to make colors "ชัดเจน" (clear)
       if (sharpenFactor > 0) {
-        ctx.filter = `contrast(${1 + sharpenFactor * 0.2}) saturate(${1 + sharpenFactor * 0.1}) brightness(1.02)`;
+        ctx.filter = `contrast(${1 + sharpenFactor * 0.6}) saturate(${1 + sharpenFactor * 0.5}) brightness(${1 + sharpenFactor * 0.08}) contrast(${1 + sharpenFactor * 0.1})`;
         ctx.drawImage(canvas, 0, 0);
       }
 
-      // Convert canvas to blob
+      // Convert canvas to blob (prefer high quality)
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('Failed to create blob from canvas');
 
       // Step 2: Upscale and final optimize using browser-image-compression
       const options = {
-        maxSizeMB: 5, // Biarkan file lebih besar untuk kualitas HD
+        maxSizeMB: 20, // Larger size for Ultra HD Master
         maxWidthOrHeight: enhancePreset,
         useWebWorker: true,
         onProgress: (progress: number) => setStatus(prev => ({ ...prev, progress })),
-        initialQuality: 1.0, // Kualitas maksimal
+        initialQuality: 1.0, // Maximum quality
         fileType: targetFormat,
-        alwaysKeepResolution: false, // Biarkan upscaling bekerja jika target > original
+        alwaysKeepResolution: false, 
         preserveExif: true,
       };
 
@@ -579,7 +584,7 @@ export default function App() {
                             >
                               <div className="space-y-4">
                                 <label className="text-xs font-bold uppercase tracking-widest text-indigo-600 flex items-center justify-between">
-                                  Ketajaman (Sharpness)
+                                  Color & Sharpness Master
                                   <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">{Math.round(sharpenFactor * 100)}%</span>
                                 </label>
                                 <input 
@@ -593,8 +598,8 @@ export default function App() {
                                   className="w-full h-1.5 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                 />
                                 <div className="flex justify-between text-[9px] text-indigo-400 uppercase font-black tracking-tighter">
-                                  <span>Soft</span>
-                                  <span>Ultra HD</span>
+                                  <span>Original Colors</span>
+                                  <span>Ultra Vibrant HD</span>
                                 </div>
                               </div>
 
@@ -776,11 +781,11 @@ export default function App() {
                               } hover:shadow-2xl`}
                             >
                               {activeTab === 'enhance' ? (
-                                <Sparkles className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                                <Sparkles className="w-5 h-5 fill-yellow-400 text-yellow-400 animate-pulse" />
                               ) : (
                                 <Zap className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                               )}
-                              {activeTab === 'enhance' ? 'Tingkatkan Kualitas HD' : 'Mulai Kompresi'}
+                              {activeTab === 'enhance' ? 'Tingkatkan Kualitas Ultra HD Master' : 'Mulai Kompresi'}
                             </button>
                           ) : (
                             <>
