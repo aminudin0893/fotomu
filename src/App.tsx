@@ -233,10 +233,11 @@ export default function App() {
       maxWidthOrHeight: maxWidth === -1 ? undefined : maxWidth,
       useWebWorker: false, // Disable web worker for better compatibility in sandboxed iframes
       onProgress: (progress: number) => setStatus(prev => ({ ...prev, progress })),
-      initialQuality: quality,
+      initialQuality: maxWidth === -1 ? Math.max(quality, 0.92) : quality, // Ultra HD quality start for original resolution
       fileType: targetFormat,
-      alwaysKeepResolution: maxWidth === -1 ? true : true, // Keep original resolution if requested or explicit
+      alwaysKeepResolution: true, // Keep original resolution as requested
       preserveExif: true,
+      maxIteration: 20, // More iterations to find the best quality point near 800KB
     };
 
     try {
