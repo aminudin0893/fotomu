@@ -230,12 +230,12 @@ export default function App() {
 
     const options = {
       maxSizeMB: 0.8,
-      maxWidthOrHeight: maxWidth,
+      maxWidthOrHeight: maxWidth === -1 ? undefined : maxWidth,
       useWebWorker: false, // Disable web worker for better compatibility in sandboxed iframes
       onProgress: (progress: number) => setStatus(prev => ({ ...prev, progress })),
       initialQuality: quality,
       fileType: targetFormat,
-      alwaysKeepResolution: true, // Keep original resolution as requested
+      alwaysKeepResolution: maxWidth === -1 ? true : true, // Keep original resolution if requested or explicit
       preserveExif: true,
     };
 
@@ -282,7 +282,7 @@ export default function App() {
       // Calculate target dimensions for Master Upscale
       let targetWidth = img.width;
       let targetHeight = img.height;
-      if (Math.max(img.width, img.height) < enhancePreset) {
+      if (enhancePreset !== -1 && Math.max(img.width, img.height) < enhancePreset) {
         const ratio = enhancePreset / Math.max(img.width, img.height);
         targetWidth = Math.round(img.width * ratio);
         targetHeight = Math.round(img.height * ratio);
@@ -551,7 +551,9 @@ export default function App() {
                               <div className="space-y-4">
                                 <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center justify-between">
                                   Dimensi 
-                                  <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-[10px] font-bold">{maxWidth}px</span>
+                                  <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                    {maxWidth === -1 ? 'Bawaan' : `${maxWidth}px`}
+                                  </span>
                                 </label>
                                 <select 
                                   value={maxWidth}
@@ -559,6 +561,7 @@ export default function App() {
                                   disabled={status.isCompressing}
                                   className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-xs font-bold appearance-none cursor-pointer"
                                 >
+                                  <option value="-1">Bawaan Asli</option>
                                   <option value="1280">HD (1280px)</option>
                                   <option value="1920">Full HD (1920px)</option>
                                   <option value="2560">2K (2560px)</option>
@@ -630,7 +633,7 @@ export default function App() {
                                 <label className="text-xs font-bold uppercase tracking-widest text-indigo-600 flex items-center justify-between">
                                   Master Upscale
                                   <span className="bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                    {enhancePreset === 1920 ? 'HD' : enhancePreset === 3840 ? '4K' : '8K'}
+                                    {enhancePreset === -1 ? 'Bawaan' : enhancePreset === 1920 ? 'HD' : enhancePreset === 3840 ? '4K' : '8K'}
                                   </span>
                                 </label>
                                 <select 
@@ -639,6 +642,7 @@ export default function App() {
                                   disabled={status.isCompressing}
                                   className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-xs font-bold appearance-none cursor-pointer text-indigo-900"
                                 >
+                                  <option value="-1">Resolusi Bawaan</option>
                                   <option value="1920">HD Master (1080p)</option>
                                   <option value="3840">Ultra HD (4K)</option>
                                   <option value="7680">Cinema (8K)</option>
